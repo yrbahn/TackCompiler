@@ -1,3 +1,5 @@
+I create a parser program for tack program using Happy and Alex for Haskell
+
 -- files
 README -- this file
 tacklexer.x -- an input of Alex, lexer generator tool
