@@ -39,11 +39,10 @@ transFun level st (FunDef {funId=fId, funType=funT, bStmt=blockStmt, funSrcPos=_
     let sL = stmtList blockStmt
     new_st''' <- foldM (insertSymbol  level') new_st' sL
     (sList, label) <- foldM (transStmt' level new_st''') ([],Nothing) sL
-    case label of
-      Nothing ->
-        return $ IFUN(fName, funType, sList ++ [makeStmt' $ IRETURN(Nothing)])
-      label' ->
-        return $ IFUN(fName, funType, sList ++ [makeStmt label $ IRETURN(Nothing)])
+    if isSame funRetType TK_VOID || isJust label
+      then  return $ IFUN(fName, funType, sList ++ [makeStmt label $ IRETURN(Nothing)])
+      else 
+        return $ IFUN(fName, funType, sList)
 
 transFieldLit :: Int ->  ST -> FieldLit -> IO (([IStmt], Maybe [ILabel]), (IId, IAddr))
 transFieldLit level st (FieldLit{fieldLitId=fId, fieldLitExpr=fE, fieldLitSrcPos=sP}) =
