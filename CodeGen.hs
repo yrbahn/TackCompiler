@@ -2,6 +2,7 @@ module CodeGen where
 import IR
 import ASM
 import Control.Monad
+import Control.Monad.Trans
 import SymbolTable
 import SymbolTypes
 
@@ -24,7 +25,13 @@ codeGenFun (IFUN(symT, name, ty, stmtList)) =
     let asmState = ASMState { funName=name', st = symT, symbols = symbolList, stringList=[] }      
     putASMState asmState
     instList <- foldM  codeGenStmt' [] stmtList
-    return $ Function (TextSection [Global name', Type name' ("."++ name')]  ((Define name):(proglogue ++ instList)) endlogue) Nothing
+    state <- getASMState
+    if (length $ stringList state) == 0 
+      then  
+        return $ Function (TextSection [Global name', Type name' "@function"]  ((Define name):(proglogue ++ instList)) endlogue) Nothing
+      else 
+        return $ Function (TextSection [Global name', Type name' "@function"]  ((Define name):(proglogue ++ instList)) endlogue) (Just $ DataSection $ concat  $ map (\s -> [Def $ fst s, Str $ snd s]) (stringList state))
+ 
     where makeSymbol symbolInfo@(symbolList, cnt)  stmt = 
             let ISTMT(_,inst) = stmt in
               case getLeftAddr inst of
@@ -73,11 +80,21 @@ codeGenInst (ICOPY(l,r)) = return []
 -- codeGenInst (ILE_JUMP(a,b,l)) =
 codeGenInst (IPARAM(index,arity,addr)) =
   do
+    let proglogue = if (index == 0 && arity > 6 ) 
+                      then  [Sub (Res RSP) (ImmNum $ arity*8)]
+                      else []
     argment <- getOperand addr
-    proglogue <- when (index == 0) ([Sub (Res RSP) (ImmNum arity*8)])
-    return $ Mov 
-                   
--- codeGenInst (ICALL(name,arity)) =
+    case argment of
+      reg@(Res _) -> return $ proglogue ++ [Mov (getArgRegOrMem index) reg]
+      mem -> 
+        case getArgRegOrMem index of 
+          reg@(Res _) -> return $ proglogue ++ [Mov reg mem] 
+          mem2 ->
+            return $ proglogue ++ [Mov (Res R12) mem, Mov mem2 (Res R12)] 
+
+codeGenInst (ICALL(name,arity)) =
+  return [Call name]
+
 -- codeGenInst (ICALLR(l,name,arity)) =
 codeGenInst (IRETURN(addr)) =
   case addr of
@@ -104,15 +121,9 @@ getOperand (IID i) =
          case look_up (st s) i of
            I_VARIABLE(_,offset,_) ->
              if offset < 1 
-               then return $ getArgRegOrMem offset
+               then return $ getArgRegOrMem $ offset*(-1)
                else error "error"
            _ -> error "error"
-    where spil os = Mem $ (show RBP) ++ "-" ++ (show $ os*8)
-          getArgRegOrMem os = 
-            let pOffset = -1 * os in
-              if pOffset > 5 
-                then Res $ paramRegs !! pOffset
-                else Mem $ (show RSP) ++ "+" ++ (show $ 8*(pOffset+1-7))
 
 getOperand (IBOOL b) =
   case b of
@@ -127,7 +138,7 @@ getOperand (ISTRING s) =
     state <- getASMState
     let stringCnt = length (stringList state)
     let stringLabel = (funName state) ++ ".S_" ++ (show stringCnt) 
-    putASMState state { stringList = (stringLabel,s):(stringList state) }
+    putASMState (state { stringList = (stringLabel,s):(stringList state) })
     return $ LabelOperand stringLabel
 
 
@@ -139,3 +150,14 @@ getOperand (ISIZEOF ty) =
   case ty of
     TK_INT -> return $ ImmNum 8
     _      -> return $ ImmNum 8 	
+
+--
+--
+spil :: Int -> Operand
+spil os = Mem $ (show RBP) ++ "-" ++ (show $ os*8)
+
+getArgRegOrMem :: Int -> Operand
+getArgRegOrMem os = 
+    if os < 6 
+      then Res $ paramRegs !! os
+      else Mem $ (show RSP) ++ "+" ++ (show $ 8*(os+1-7))

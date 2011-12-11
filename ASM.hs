@@ -14,13 +14,15 @@ data Directive =
   | Global String
   | Def String
   | Size String String
+  | Str String
 
 instance Show Directive where
   show IntelSyntax = ".intel_syntax"
   show (Type a b)  = ".type " ++ a ++ ", " ++ b
-  show (Global a)  = ".global " ++ a 
+  show (Global a)  = ".globl " ++ a 
   show (Size a b)  = ".size " ++ a ++ ", " ++ b
   show (Def d)  = d ++ ":"
+  show (Str s) = ".string " ++ show s
 
 data Function = 
   Function Section (Maybe Section)
@@ -96,13 +98,15 @@ data Operand =
   Res Register
   | ImmNum Int
   | LabelOperand String
+  | LabelString String
   | Mem String
   deriving (Eq)
 
 instance Show Operand where
   show (Res r) = show r
   show (ImmNum i)     = show i
-  show (LabelOperand s)  = s
+  show (LabelOperand s)  = "OFFSET FLAT:"++ s
+  show (LabelString s)  = s
   show (Mem s)        = "QWORD PTR [" ++ s ++ "]"
 
 data Register = RAX | RBX | RCX | RDX | RSP | RBP | RSI | RDI 
@@ -133,7 +137,7 @@ resultReg = RAX
 data ASMState = ASMState
   { funName::String, st::ST, symbols :: [(String,Int)], stringList::[(String,String)] }
 
-emptyASMState = ASMState { funName="", st = empty, symbols = [], stringList=[]}
+emptyASMState = ASMState { funName="empty", st = empty, symbols = [], stringList=[]}
 
 newtype ASMTranslator m a = ASMTranslator 
   { runASM :: ASMState -> m (a, ASMState) }
@@ -150,8 +154,8 @@ instance MonadTrans ASMTranslator where
   lift m = ASMTranslator $ \ns -> do a <- m
                                      return (a, ns)
 
-putASMState :: Monad m => a -> ASMTranslator m ()
-putASMState s = ASMTranslator $ \s -> return ((), s) 
+putASMState :: Monad m => ASMState -> ASMTranslator m ()
+putASMState s = ASMTranslator $ \st -> return ((), s) 
 
 getASMState :: Monad m => ASMTranslator m ASMState
 getASMState = ASMTranslator $ \s -> return (s, s)
