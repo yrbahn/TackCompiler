@@ -3,17 +3,12 @@ sort = fun (a : [int]) -> void {
   n = size(a);
   for iOuter in range(0, n-1) {
     iSmallest = iOuter;
-    #print(iOuter:string + " iouter=\n");
     for iInner in range(iOuter, n) {
-      #print(iInner:string + " inner\n");
       if a[iInner] < a[iSmallest] {
         iSmallest := iInner;
       }
     }
     eSmallest = a[iSmallest];
-    #print(iSmallest:string + " " + a[iSmallest]:string + "\n");
-    #print(iOuter:string + " " + a[iOuter]:string + "\n");
-    #print("--\n");
     a[iSmallest] := a[iOuter];
     a[iOuter] := eSmallest;
   }

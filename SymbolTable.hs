@@ -34,24 +34,24 @@ new_scope :: SCOPE_TYPE -> ST -> ST
 new_scope scopeType st = Sym_Table(scopeType, 0,0,[]):st
 
 -- insert a symbol into the symbol table
-insert :: Int -> ST -> SYMBOL_DESC -> (Int, ST)
-insert n [] d = error "Symbol table error : insertion before defining scope."
-insert n ((Sym_Table(scopeT, nLocal, nArg, lSym)):rest) (ARGUMENT(str, t)) =
+insert :: ST -> SYMBOL_DESC -> ST
+insert [] d = error "Symbol table error : insertion before defining scope."
+insert ((Sym_Table(scopeT, nLocal, nArg, lSym)):rest) (ARGUMENT(str, t)) =
   case in_index_list str lSym of
     True  -> error ("Symbol table error : " ++ str ++ " is already defined")
-    False -> (n,(Sym_Table(scopeT, nLocal, nArg+1, (str, VAR_ATTR(-nArg,t)):lSym)):rest) 
-insert n ((Sym_Table(scopeT, nLocal, nArg, lSym)):rest) (VARIABLE (str, t))  =
+    False -> Sym_Table(scopeT, nLocal, nArg+1, (str, VAR_ATTR(-1*nArg,t)):lSym):rest
+insert ((Sym_Table(scopeT, nLocal, nArg, lSym)):rest) (VARIABLE (str, t))  =
   case in_index_list str lSym  of 
     True  -> error ("Symbol table error :" ++ str ++ " is already defined")
-    False -> (n,(Sym_Table(scopeT, nLocal+1, nArg, (str, VAR_ATTR(nLocal+1,t)):lSym)):rest) 
-insert n ((Sym_Table(scopeT, nLocal, nArg, lSym)):rest) (FUNCTION (str, argT, retT)) =
+    False -> Sym_Table(scopeT, nLocal+1, nArg, (str, VAR_ATTR(nLocal+1,t)):lSym):rest
+insert ((Sym_Table(scopeT, nLocal, nArg, lSym)):rest) (FUNCTION (str, argT, retT)) =
   case in_index_list str lSym of
     True  -> error ("Symbol table error : " ++ str ++ " is already defined")
-    False -> (n,(Sym_Table(scopeT, nLocal, nArg, (str, FUN_ATTR("func",argT, retT)):lSym)):rest) 
-insert n ((Sym_Table(scopeT, nLocal, nArg, lSym)):rest) (SUBST(str, str2, vT)) =
+    False -> Sym_Table(scopeT, nLocal, nArg, (str, FUN_ATTR("func",argT, retT)):lSym):rest
+insert ((Sym_Table(scopeT, nLocal, nArg, lSym)):rest) (SUBST(str, str2, vT)) =
   case in_index_list str lSym of
     True  -> error ("Symbol table error : " ++ str ++ " is already defined")
-    False -> (n,(Sym_Table(scopeT, nLocal+1, nArg, (str, SUBST_ATTR(nLocal+1, str2, vT)):lSym)):rest) 
+    False -> Sym_Table(scopeT, nLocal+1, nArg, (str, SUBST_ATTR(nLocal+1, str2, vT)):lSym):rest
 
 in_index_list :: SYMBOL -> [(SYMBOL,SYMBOL_VALUE)] -> Bool
 in_index_list str [] = False

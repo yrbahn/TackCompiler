@@ -17,10 +17,10 @@ instance Show IProg where
   show (IPROG funDefList) = 
     unlines $ map show funDefList
 
-data IFun  = IFUN (IString, TACK_TYPE, [IStmt]) 
+data IFun  = IFUN (ST, IString, TACK_TYPE, [IStmt]) 
 
 instance Show IFun where
-  show (IFUN(funId, ty, stmtList)) = 
+  show (IFUN(_, funId, ty, stmtList)) = 
     funId ++ " = fun " ++ show ty ++ "\n" ++ (unlines $ map (\x-> show x ++ ";") stmtList)
 
 data IStmt = ISTMT ([ILabel], IInst) 
@@ -145,3 +145,15 @@ addLabelToStmtList :: Maybe [ILabel] -> [IStmt] -> [IStmt]
 addLabelToStmtList label []     = []
 addLabelToStmtList label (x:xs) = (addLabel label x):xs
 
+getLeftAddr :: IInst -> Maybe IAddr
+getLeftAddr inst = 
+  case inst of
+    ICOPY (l, _) -> Just l
+    IPLUS  (l, _, _) -> Just l
+    IMINUS (l, _, _) -> Just l
+    ITIMES (l, _, _) -> Just l
+    IDIV   (l, _, _) -> Just l
+    IMOD   (l, _, _) -> Just l
+    IPMINUS (l, _)   -> Just l
+    ICALLR (l, _, _) -> Just l
+    _ -> Nothing

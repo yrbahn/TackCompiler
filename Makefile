@@ -2,7 +2,7 @@
 
 default: ir_translator
 
-ir_translator : TackParser.hs TackLexer.hs Token.hs PrettyPrint.hs AST.hs SrcPos.hs TackPPrinter.hs Scope.hs SymbolTable.hs SymbolTypes.hs  GetTackType.hs IR.hs IRTranslator.hs
+ir_translator : TackParser.hs TackLexer.hs Token.hs PrettyPrint.hs AST.hs SrcPos.hs TackPPrinter.hs Scope.hs SymbolTable.hs SymbolTypes.hs  GetTackType.hs IR.hs IRTranslator.hs ASM.hs CodeGen.hs
 	ghc --make  -optl"-Wl,-read_only_relocs,suppress" -o ir_translator Main.hs
 
 TackLexer.hs: TackLexer.x 

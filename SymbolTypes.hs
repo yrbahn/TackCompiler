@@ -117,3 +117,5 @@ getTackTypeFromSymbolDesc (I_VARIABLE(_, _, t)) = t
 getTackTypeFromSymbolDesc (I_FUNCTION(_, fId, aT, rT)) = TK_FUN fId aT rT
 getTackTypeFromSymbolDesc (I_SUBST(_, _,_, vT)) =  vT
 getTackTypeFromSymbolDesc NO_FOUND = TK_ERROR
+
+

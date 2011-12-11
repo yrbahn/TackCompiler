@@ -24,7 +24,7 @@ printSymbolTable level st (Program {funDefList=fl}) =
     where
       insertIntriFun :: ST -> SYMBOL_DESC -> ST
       insertIntriFun st i = 
-        snd $ insert level st i       
+        insert st i       
 
 printSymbolTableFunDef ::  Int -> ST -> FunDef -> IO ()
 printSymbolTableFunDef level st (FunDef {funId=fId, funType=funT, bStmt=BlockStmt{stmtList=sL, stmtSrcPos=_}, funSrcPos=_}) =
@@ -52,13 +52,13 @@ printSymbolTableFieldLit level stAndType (FieldLit{fieldLitId=fId, fieldLitExpr=
   do
     (st, fieldTL)  <- stAndType
     fT <- printSymbolTableExpr level st fE
-    return $ (snd $ insert level st (VARIABLE (fieldIdName fId, fT)), (fieldIdName fId,fT):fieldTL)
+    return $ (insert st (VARIABLE (fieldIdName fId, fT)), (fieldIdName fId,fT):fieldTL)
 
 printSymbolTableFieldLitVar :: Int -> IO (ST, [(String,TACK_TYPE)])  -> FieldLit -> IO (ST, [(String,TACK_TYPE)])
 printSymbolTableFieldLitVar level stAndType (FieldLit{fieldLitId=fId, fieldLitExpr=fE, fieldLitSrcPos=sP}) =
   do
     (st, fieldTL)  <- stAndType
-    return $ (snd $ insert level st (VARIABLE (fieldIdName fId, TK_NULL)), (fieldIdName fId, TK_NULL):fieldTL)
+    return $ (insert st (VARIABLE (fieldIdName fId, TK_NULL)), (fieldIdName fId, TK_NULL):fieldTL)
 
 printSymbolTableType :: Int -> IO ST -> Type -> IO ST
 printSymbolTableType level st (RecordType {fieldTypeList=fieldL, typeSrcPos=_}) =
@@ -76,7 +76,7 @@ printSymbolTableType level st (FieldType {fieldId=FieldId{fieldIdName=fId, field
   do 
     st'    <- st
     fT     <- getTackType fType
-    new_st <- return $ snd $ insert level st' (VARIABLE(fId, fT)) 
+    new_st <- return $ insert  st' (VARIABLE(fId, fT)) 
     printSymbolTableType level (return new_st) fType
 
 printSymbolTableType level st (PrimitiveType {name=n, typeSrcPos=sP}) = 
@@ -124,7 +124,7 @@ printSymbolTableStmt level st (ForStmt {varId=vId, forExpr=fE, blockStmt=BlockSt
         let level' = level +1
         let new_st = new_scope (L_FORSTMT vIdName) st
         forE <- printSymbolTableExpr level' new_st fE
-        let new_st' = snd $ insert level new_st (VARIABLE (vIdName, TK_NULL))
+        let new_st' = insert new_st (VARIABLE (vIdName, TK_NULL))
         new_st'' <- foldl (insertVar level') (return new_st') sL
         putStrLn $ indent level' . show $ head new_st''
         mapM_ (printSymbolTableStmt level' new_st') sL    
@@ -246,7 +246,7 @@ insertFunDef level st (FunDef {funId=FunId {funIdName=fname, exprSrcPos=_}, funT
     argT' <- getTackType argT
     retT' <- getTackType retT
     st'   <- st
-    return $ snd $ insert level st' (FUNCTION (fname, argT', retT'))
+    return $ insert st' (FUNCTION (fname, argT', retT'))
 
 insertVarDef :: Int -> IO ST -> Stmt -> IO ST
 insertVarDef level st (VarDef {varId=vId, varExpr=ve, stmtSrcPos=_}) =
@@ -254,7 +254,7 @@ insertVarDef level st (VarDef {varId=vId, varExpr=ve, stmtSrcPos=_}) =
     VarId {varIdName=varId, exprSrcPos=_} ->
       do
         st' <- st
-        return $ snd $ insert level st' (VARIABLE (varId, TK_NULL))
+        return $ insert st' (VARIABLE (varId, TK_NULL))
     _ -> st
 
 
@@ -279,7 +279,7 @@ insertVar level st (VarDef {varId=vId, varExpr=ve, stmtSrcPos=_}) =
     VarId {varIdName=varId, exprSrcPos=_} ->
       do
 	st' <- st
-	return $ snd $ insert level st' (VARIABLE (varId, TK_NULL))
+	return $ insert st' (VARIABLE (varId, TK_NULL))
     _ -> st
 
 insertVar level st (IfStmt {bExpr=bE, thenStmts=tS, elseStmts=eS, stmtSrcPos=sP}) =
@@ -302,7 +302,7 @@ insertFieldVar level st (FieldType {fieldId=fId, fieldType=fType, typeSrcPos=sP}
   do
     st'    <- st
     fT     <- getTackType fType
-    return $ snd $ insert level st' (VARIABLE(fieldIdName fId, fT))
+    return $ insert st' (VARIABLE(fieldIdName fId, fT))
 
 insertFieldVar level st _ = st
 

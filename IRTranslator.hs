@@ -23,7 +23,7 @@ transProg level st (Program {funDefList=fl}) =
     where
       insertIntriFun :: ST -> SYMBOL_DESC -> ST
       insertIntriFun st i = 
-        snd $ insert level st i       
+        insert st i       
 
 transFun ::  Int -> ST -> FunDef -> IO (IFun)
 transFun level st (FunDef {funId=fId, funType=funT, bStmt=blockStmt, funSrcPos=_}) =
@@ -40,9 +40,9 @@ transFun level st (FunDef {funId=fId, funType=funT, bStmt=blockStmt, funSrcPos=_
     new_st''' <- foldM (insertSymbol  level') new_st' sL
     (sList, label) <- foldM (transStmt' level new_st''') ([],Nothing) sL
     if isSame funRetType TK_VOID || isJust label
-      then  return $ IFUN(fName, funType, sList ++ [makeStmt label $ IRETURN(Nothing)])
+      then  return $ IFUN(new_st''', fName, funType, sList ++ [makeStmt label $ IRETURN(Nothing)])
       else 
-        return $ IFUN(fName, funType, sList)
+        return $ IFUN(new_st''', fName, funType, sList) 
 
 transFieldLit :: Int ->  ST -> FieldLit -> IO (([IStmt], Maybe [ILabel]), (IId, IAddr))
 transFieldLit level st (FieldLit{fieldLitId=fId, fieldLitExpr=fE, fieldLitSrcPos=sP}) =
@@ -192,7 +192,9 @@ transStmt level st (CallStmt {cExpr=CallExpr {fNameExpr=fN,argExprs=aEL,exprSrcP
     ((codeL,label), argL) <- transExprs level st aEL
     let arity = length argL
     case fN of
-      FunId{funIdName=fId,exprSrcPos=_} -> return (codeL ++ addLabelToStmtList label (foldl (genIParamCode arity) [] argL) 
+      FunId{funIdName=fId,exprSrcPos=_} -> 
+        do
+          return (codeL ++ addLabelToStmtList label (foldl (genIParamCode arity) [] argL) 
                                              ++ [makeStmt' $ ICALL(fId, arity)], Nothing)
       _ -> error "error!"
        
@@ -242,12 +244,12 @@ transStmt level st (ForStmt {varId=VarId{varIdName=vId,exprSrcPos=_}, forExpr=fE
     where insertForStmtId level st vId' ty =
             case look_up st vId' of
               NO_FOUND ->
-                let (_, newSt) = insert level st $ VARIABLE(vId', ty) in
+                let newSt = insert st $ VARIABLE(vId', ty) in
                   return (IID vId, newSt)
               _ -> 
                 do
                   newVar <- genNewAddr
-                  let (_, newSt) = insert level st $ SUBST(vId' ,show newVar, ty)
+                  let newSt = insert st $ SUBST(vId' ,show newVar, ty)
                   return (newVar, newSt)
  
 transStmt level st (IfStmt {bExpr=bE, thenStmts=tS, elseStmts=eS, stmtSrcPos=sP}) =
@@ -654,7 +656,7 @@ insertFun level st (FunDef {funId=FunId {funIdName=fname, exprSrcPos=_}, funType
   do
     argT' <- getTackType argT
     retT' <- getTackType retT
-    return $ snd $ insert level st (FUNCTION (fname, argT', retT'))
+    return $ insert st (FUNCTION (fname, argT', retT'))
 
 insertSymbol :: Int -> ST -> Stmt -> IO ST
 insertSymbol level st (VarDef {varId=vId, varExpr=ve, stmtSrcPos=_}) =
@@ -663,11 +665,11 @@ insertSymbol level st (VarDef {varId=vId, varExpr=ve, stmtSrcPos=_}) =
     let varId = varIdName vId
     case look_up st varId of
       NO_FOUND ->
-        return $ snd $ insert level st (VARIABLE (varId, exprType))
+        return $ insert st (VARIABLE (varId, exprType))
       _ ->
         do
           newAddr <- genNewAddr
-          return $ snd $ insert level st (SUBST(varId, show newAddr, exprType))
+          return $ insert st (SUBST(varId, show newAddr, exprType))
 
 insertSymbol level st (WhileStmt {whileBoolExpr=bE, whileStmts=s, stmtSrcPos=sP}) =
   insertSymbol level st s
@@ -679,7 +681,7 @@ insertArgument:: Int -> ST -> Type -> IO ST
 insertArgument level st (FieldType {fieldId=fId, fieldType=fType, typeSrcPos=sP}) =
   do
     fT     <- getTackType fType
-    return $ snd $ insert level st (VARIABLE(fieldIdName fId, fT))
+    return $ insert st (VARIABLE(fieldIdName fId, fT))
 
 insertArgument level st _ = return st
 

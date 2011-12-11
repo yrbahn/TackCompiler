@@ -32,13 +32,13 @@ instance Show Function where
       Just s' -> show s ++ show s'
 
 data Section = 
-  TextSection [Directive] [Instruction]
+  TextSection [Directive] [Instruction] [Directive]
   | DataSection [Directive]
 
 instance Show Section where
-  show (TextSection directiveList instructList) = 
+  show (TextSection directiveList instructList directiveList2) = 
     ".text\n" ++ (unlines $ map (\x-> show x) directiveList) 
-    ++ (unlines $ map (\x -> show x) instructList) 
+    ++ (unlines $ map (\x -> show x) instructList)  ++ (unlines $ map (\x-> show x) directiveList2)
   show (DataSection dList) = 
     ".section .rodata\n" ++ (unlines $ map (\x -> show x) dList)  
     
@@ -103,7 +103,7 @@ instance Show Operand where
   show (Res r) = show r
   show (ImmNum i)     = show i
   show (LabelOperand s)  = s
-  show (Mem s)        = s
+  show (Mem s)        = "QWORD PTR [" ++ s ++ "]"
 
 data Register = RAX | RBX | RCX | RDX | RSP | RBP | RSI | RDI 
   | R8 | R9 | R10 | R11 | R12 | R13 | R14 | R15
@@ -127,10 +127,13 @@ instance Show Register where
   show R14 = "%r14"
   show R15 = "%r15"
 
-data ASMState = ASMState
-  { st::ST, symbols :: [(String,Int)] }
+paramRegs = [RDI, RSI, RDX, RCX, R8, R9]
+resultReg = RAX
 
-emptyASMState = ASMState { st = empty, symbols = []}
+data ASMState = ASMState
+  { funName::String, st::ST, symbols :: [(String,Int)], stringList::[(String,String)] }
+
+emptyASMState = ASMState { funName="", st = empty, symbols = [], stringList=[]}
 
 newtype ASMTranslator m a = ASMTranslator 
   { runASM :: ASMState -> m (a, ASMState) }
