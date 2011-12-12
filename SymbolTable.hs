@@ -58,6 +58,18 @@ in_index_list str [] = False
 in_index_list str ((x,_):xs) | str==x  = True
                              | otherwise = in_index_list str xs
 
+getArgsFromCurrentScope :: String -> ST -> [(String,Int)]
+getArgsFromCurrentScope funName st = 
+  case st of
+    ((Sym_Table(L_FUN funName _, _, _, symL)):rest) -> getArgs symL
+    _ -> error "no such function scope"
+  where 
+    getArgs [] = []
+    getArgs ((str, VAR_ATTR(offset,_)):rt) = 
+     if offset > 0 
+       then getArgs rt
+       else (str,offset*(-1) +1):getArgs rt
+
 -- lookup a symbol
 look_up :: ST -> SYMBOL -> SYMBOL_I_DESC
 look_up s x = find 0 s where

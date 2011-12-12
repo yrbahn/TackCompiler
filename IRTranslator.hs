@@ -49,7 +49,8 @@ transFieldLit level st (FieldLit{fieldLitId=fId, fieldLitExpr=fE, fieldLitSrcPos
   if isAddr fE
     then return (([], Nothing), (fieldIdName fId, getAddr st fE))
     else do
-           newAddr <- genNewAddr
+           newAType <- getTackTypeFromExpr level st fE
+           newAddr <- genNewAddr $ newAType
            codeAndLabel <- transExpr level st newAddr fE
            return ( codeAndLabel, (fieldIdName fId, newAddr))
 
@@ -105,17 +106,21 @@ transStmt level st (AssignStmt {leftExpr=lE, rightExpr=rE, stmtSrcPos=_}) =
                then if isAddr rE
                       then return ([makeStmt' $ IARRAY_WRITE(getAddr st sE, getAddr st subE, getAddr st rE)], Nothing) 
                       else do
-                             newAddr <- genNewAddr
+                             newAType <- getTackTypeFromExpr level st rE
+                             newAddr <- genNewAddr newAType
                              (code,label) <- transExpr level st newAddr rE
                              return (code ++ [makeStmt label $ IARRAY_WRITE(getAddr st sE, getAddr st subE, newAddr)], Nothing)
                else if isAddr rE
                       then do
-                             newAddr <- genNewAddr
+                             newAType <- getTackTypeFromExpr level st subE
+                             newAddr <- genNewAddr newAType
                              (code, label) <- transExpr level st newAddr subE
                              return (code ++ [makeStmt label $ IARRAY_WRITE(getAddr st sE, newAddr, getAddr st rE)], Nothing)
                       else do
-                             newAddr1 <- genNewAddr
-                             newAddr2 <- genNewAddr
+                             newAType1 <- getTackTypeFromExpr level st rE
+                             newAType2 <- getTackTypeFromExpr level st subE                            
+                             newAddr1 <- genNewAddr newAType1
+                             newAddr2 <- genNewAddr newAType2
                              (code1, label1) <- transExpr level st newAddr1 rE
                              (code2, label2) <- transExpr level st newAddr2 subE
                              return (code1 ++ addLabelToStmtList label1 code2 
@@ -123,28 +128,36 @@ transStmt level st (AssignStmt {leftExpr=lE, rightExpr=rE, stmtSrcPos=_}) =
         else if isAddr subE
                then if isAddr rE
                       then do
-                             newAddr <- genNewAddr
+                             newAType <- getTackTypeFromExpr level st sE
+                             newAddr <- genNewAddr newAType
                              (code,label) <- transExpr level st newAddr sE
                              return (code ++ [makeStmt label $ IARRAY_WRITE(newAddr, getAddr st subE, getAddr st rE)], Nothing) 
                       else do
-                             newAddr1 <- genNewAddr
-                             newAddr2 <- genNewAddr       
+                             newAType1 <- getTackTypeFromExpr level st rE
+                             newAType2 <- getTackTypeFromExpr level st sE                            
+                             newAddr1 <- genNewAddr newAType1
+                             newAddr2 <- genNewAddr newAType2
                              (code1,label1) <- transExpr level st newAddr1 rE
                              (code2,label2) <- transExpr level st newAddr2 sE
                              return (code1 ++ addLabelToStmtList label1 code2 
                                ++ [makeStmt label2 $ IARRAY_WRITE(newAddr2, getAddr st subE, newAddr1)], Nothing)
                else if isAddr rE
                       then do
-                             newAddr1 <- genNewAddr
-                             newAddr2 <- genNewAddr
+                             newAType1 <- getTackTypeFromExpr level st sE
+                             newAType2 <- getTackTypeFromExpr level st subE                            
+                             newAddr1 <- genNewAddr newAType1
+                             newAddr2 <- genNewAddr newAType2
                              (code1, label1) <- transExpr level st newAddr1 sE
                              (code2, label2) <- transExpr level st newAddr2 subE
                              return (code1 ++ addLabelToStmtList label1 code2 
                                ++ [makeStmt label2 $ IARRAY_WRITE(newAddr1, newAddr2, getAddr st rE)], Nothing)
                       else do
-                             newAddr1 <- genNewAddr
-                             newAddr2 <- genNewAddr
-                             newAddr3 <- genNewAddr
+                             newAType1 <- getTackTypeFromExpr level st rE
+                             newAType2 <- getTackTypeFromExpr level st sE                            
+                             newAType3 <- getTackTypeFromExpr level st subE                            
+                             newAddr1 <- genNewAddr newAType1
+                             newAddr2 <- genNewAddr newAType2
+                             newAddr3 <- genNewAddr newAType3
                              (code1, label1) <- transExpr level st newAddr1 rE
                              (code2, label2) <- transExpr level st newAddr2 sE
                              (code3, label3) <- transExpr level st newAddr3 subE
@@ -158,24 +171,30 @@ transStmt level st (AssignStmt {leftExpr=lE, rightExpr=rE, stmtSrcPos=_}) =
         then if isAddr rE 
                then return ([makeStmt' $ IRECORD_WRITE(getAddr st fE, fieldIdName fId, getAddr st rE)], Nothing)
                else do
-                      newAddr <- genNewAddr
+                      newAType <- getTackTypeFromExpr level st rE
+                      newAddr <- genNewAddr newAType
                       (code, label) <- transExpr level st newAddr rE
                       return ( code ++ [makeStmt label $ IRECORD_WRITE(getAddr st fE, fieldIdName fId, newAddr)],Nothing)
         else if isAddr rE
                then do
-                      newAddr <- genNewAddr
+                      newAType <- getTackTypeFromExpr level st fE
+                      newAddr <- genNewAddr newAType
                       (code, label) <- transExpr level st newAddr fE
                       return ( code ++ [makeStmt label $ IRECORD_WRITE(newAddr, fieldIdName fId, getAddr st rE)],Nothing)
                else do
-                      newAddr1 <- genNewAddr
-                      newAddr2 <- genNewAddr
+                      newAType1 <- getTackTypeFromExpr level st rE
+                      newAType2 <- getTackTypeFromExpr level st fE
+                      newAddr1 <- genNewAddr newAType1
+                      newAddr2 <- genNewAddr newAType2
                       (code1, label1) <- transExpr level st newAddr1 rE
                       (code2, label2) <- transExpr level st newAddr2 fE
                       return (code1 ++ addLabelToStmtList label1 code2 ++ [makeStmt label2 $ IRECORD_WRITE(newAddr2, fieldIdName fId, newAddr1)], Nothing)
     _ ->
-      do
-        newAddr1 <- genNewAddr
-        newAddr2 <- genNewAddr
+      do 
+        newAType1 <- getTackTypeFromExpr level st lE
+        newAType2 <- getTackTypeFromExpr level st rE
+        newAddr1 <- genNewAddr newAType1
+        newAddr2 <- genNewAddr newAType2
         (code1, label1) <- transExpr level st newAddr1 lE
         (code2, label2) <- transExpr level st newAddr2 rE
         return (code1 ++ addLabelToStmtList label1 code2 ++ [makeStmt label2 $ ICOPY(newAddr1, newAddr2)], Nothing)
@@ -211,8 +230,8 @@ transStmt level st (ForStmt {varId=VarId{varIdName=vId,exprSrcPos=_}, forExpr=fE
                    (forVarId, newSt') <- insertForStmtId level' newSt vId elemType
                    newSt'' <- foldM (insertSymbol level') newSt' sL
                    (code2, label2) <- foldM (transStmt' level newSt'') ([],Nothing) sL
-                   retAddr <- genNewAddr
-                   iAddr   <- genNewAddr
+                   retAddr <- genNewAddr TK_INT
+                   iAddr   <- genNewAddr TK_INT
                    tLabel  <- genNewLabel
                    fLabel  <- genNewLabel
                    lLabel  <- genNewLabel
@@ -224,13 +243,14 @@ transStmt level st (ForStmt {varId=VarId{varIdName=vId,exprSrcPos=_}, forExpr=fE
                      ++ [makeStmt label2 $IPLUS(iAddr,iAddr,IINT 1)]
                      ++ [makeStmt' $ IUNCOND_JUMP(lLabel)], Just [fLabel])
             else do
-                   forExprAddr <- genNewAddr
+                   newAType <- getTackTypeFromExpr level st fE
+                   forExprAddr <- genNewAddr newAType
                    (code1, label1) <- transExpr level' newSt forExprAddr fE
                    (forVarId, newSt') <- insertForStmtId level' newSt vId elemType
                    newSt'' <- foldM (insertSymbol level') newSt' sL
                    (code2, label2) <- foldM (transStmt' level newSt'') ([],Nothing) sL
-                   retAddr <- genNewAddr
-                   iAddr   <- genNewAddr
+                   retAddr <- genNewAddr TK_INT
+                   iAddr   <- genNewAddr TK_INT
                    tLabel  <- genNewLabel
                    fLabel  <- genNewLabel
                    lLabel  <- genNewLabel
@@ -245,10 +265,10 @@ transStmt level st (ForStmt {varId=VarId{varIdName=vId,exprSrcPos=_}, forExpr=fE
             case look_up st vId' of
               NO_FOUND ->
                 let newSt = insert st $ VARIABLE(vId', ty) in
-                  return (IID vId, newSt)
+                  return (IID vId ty, newSt)
               _ -> 
                 do
-                  newVar <- genNewAddr
+                  newVar <- genNewAddr ty
                   let newSt = insert st $ SUBST(vId' ,show newVar, ty)
                   return (newVar, newSt)
  
@@ -278,7 +298,8 @@ transStmt level st (ReturnStmt {rExpr=rE, stmtSrcPos=sP}) =
       if isAddr e
         then return ([makeStmt' $ IRETURN(Just $ getAddr st e)], Nothing)
         else do
-               newAddr <- genNewAddr
+               newAType <- getTackTypeFromExpr level st e
+               newAddr <- genNewAddr newAType
                (code, label) <- transExpr level st newAddr e
                return (code ++ [makeStmt label $ IRETURN(Just newAddr)], Nothing)
 
@@ -315,7 +336,8 @@ transExprs level st exprList =
               else do
                      let preLabel     = snd $ fst acc
                      let preStmtList  = fst $ fst acc
-                     newAddr    <- genNewAddr
+                     newAType <- getTackTypeFromExpr level st expr
+                     newAddr    <- genNewAddr newAType
                      (codeL, label) <- transExpr level st newAddr expr
                      return ((preStmtList ++ (addLabelToStmtList preLabel codeL), label), (snd acc) ++ [newAddr])
 
@@ -344,13 +366,13 @@ transExpr level st addr (infixE@InfixExpr{op=o, inFixLeftExpr=lE, inFixRightExpr
                                     ++ [makeStmt' $ ICALLR(addr,"append",2)],Nothing) 
                              else if ((lType == TK_STRING) && (rType == TK_INT)) 
                                   then do
-                                         castNewAddr <- genNewAddr
+                                         castNewAddr <- genNewAddr TK_STRING
                                          return ([makeStmt' $ ICAST(castNewAddr, getAddr st rE, TK_STRING)]
                                            ++ [makeStmt' $ IPARAM(0,2,getAddr st lE), makeStmt' $ IPARAM(1,2,castNewAddr)] 
                                            ++ [makeStmt' $ ICALLR(addr,"append",2)], Nothing)
                                   else if ((lType == TK_INT) && (rType == TK_STRING)) 
                                        then do
-                                              castNewAddr <- genNewAddr
+                                              castNewAddr <- genNewAddr TK_STRING
                                               return ([makeStmt' $ ICAST(castNewAddr, getAddr st lE, TK_STRING)]
                                                 ++ [makeStmt' $ IPARAM(0,2, castNewAddr), makeStmt' $ IPARAM(1,2, getAddr st rE)] 
                                                 ++ [makeStmt' $ ICALLR(addr,"append",2)], Nothing)
@@ -360,7 +382,8 @@ transExpr level st addr (infixE@InfixExpr{op=o, inFixLeftExpr=lE, inFixRightExpr
                       "*" -> return ([makeStmt' $ ITIMES(addr, getAddr st lE, getAddr st rE)], Nothing)
                       "%" -> return ([makeStmt' $ IMOD  (addr, getAddr st lE, getAddr st rE)], Nothing)
                   else do
-                         newRAddr   <- genNewAddr
+                         newAType <- getTackTypeFromExpr level st rE
+                         newRAddr   <- genNewAddr newAType
                          (rCode, label) <- transExpr level st newRAddr rE
                          case o of 
                            "+" -> 
@@ -371,13 +394,13 @@ transExpr level st addr (infixE@InfixExpr{op=o, inFixLeftExpr=lE, inFixRightExpr
                                          ++ [makeStmt' $ IPARAM(1,2, newRAddr), makeStmt' $ ICALLR(addr, "append",2)], Nothing)
                                   else if ((lType == TK_STRING) && (rType == TK_INT)) 
                                          then do
-                                                castNewAddr <- genNewAddr
+                                                castNewAddr <- genNewAddr TK_STRING
                                                 return ( rCode ++ [makeStmt label $ ICAST(castNewAddr,newRAddr, TK_STRING)]
                                                   ++ [makeStmt' $ IPARAM(0,2,getAddr st lE), makeStmt' $ IPARAM(1,2, castNewAddr)]
                                                   ++ [makeStmt' $ ICALLR(addr, "append",2)], Nothing)
                                          else if ((lType == TK_INT) && (rType == TK_STRING))
                                                 then do
-                                                       castNewAddr <- genNewAddr
+                                                       castNewAddr <- genNewAddr TK_STRING
                                                        return (rCode ++ [makeStmt label $ ICAST(castNewAddr,getAddr st lE, TK_STRING)]
                                                          ++  [makeStmt' $ IPARAM(0,2,castNewAddr), makeStmt' $ IPARAM(1,2, newRAddr)]
                                                          ++ [makeStmt' $ ICALLR(addr, "append",2)], Nothing)
@@ -388,7 +411,8 @@ transExpr level st addr (infixE@InfixExpr{op=o, inFixLeftExpr=lE, inFixRightExpr
                            "%" -> return (rCode ++ [makeStmt label (IMOD  (addr, getAddr st lE, newRAddr))], Nothing)
            else if isAddr rE 
                   then do
-                         newLAddr   <- genNewAddr
+                         newAType <- getTackTypeFromExpr level st lE
+                         newLAddr   <- genNewAddr newAType
                          (lCode, label) <- transExpr level st newLAddr lE
                          case o of 
                            "+" -> 
@@ -399,13 +423,13 @@ transExpr level st addr (infixE@InfixExpr{op=o, inFixLeftExpr=lE, inFixRightExpr
                                          ++ [makeStmt' $ IPARAM(1,2, getAddr st rE), makeStmt' $ ICALLR(addr, "append",2)], Nothing)
                                   else if ((lType == TK_STRING) && (rType == TK_INT))
                                          then do
-                                                castNewAddr <- genNewAddr
+                                                castNewAddr <- genNewAddr TK_STRING
                                                 return (lCode ++ [makeStmt label $ ICAST(castNewAddr, getAddr st rE, TK_STRING)]
                                                   ++ [makeStmt' $ IPARAM(0,2,newLAddr), makeStmt' $ IPARAM(1,2, castNewAddr)]
                                                   ++ [makeStmt' $ ICALLR(addr, "append",2)], Nothing)
                                          else if ((lType == TK_INT) && (rType == TK_STRING))
 	                                            then do
-                                                       castNewAddr <- genNewAddr
+                                                       castNewAddr <- genNewAddr TK_STRING
                                                        return  (lCode ++ [makeStmt label $ ICAST(castNewAddr, newLAddr, TK_STRING)]
                                                          ++ [makeStmt' $ IPARAM(0,2,castNewAddr), makeStmt' $ IPARAM(1,2, getAddr  st rE)]
                                                          ++ [makeStmt' $ ICALLR(addr, "append",2)], Nothing)
@@ -415,8 +439,10 @@ transExpr level st addr (infixE@InfixExpr{op=o, inFixLeftExpr=lE, inFixRightExpr
                            "*" -> return (lCode ++ [makeStmt label (ITIMES(addr, newLAddr, getAddr st rE))], Nothing)
                            "%" -> return (lCode ++ [makeStmt label (IMOD(addr, newLAddr, getAddr st rE))], Nothing)
                   else do
-                         newLAddr <- genNewAddr
-                         newRAddr <- genNewAddr
+                         newAType1 <- getTackTypeFromExpr level st lE
+                         newAType2 <- getTackTypeFromExpr level st rE
+                         newLAddr <- genNewAddr newAType1
+                         newRAddr <- genNewAddr newAType2
                          (lCode, label1) <- transExpr level st newLAddr lE
                          (rCode, label2) <- transExpr level st newRAddr rE
                          case o of
@@ -429,14 +455,14 @@ transExpr level st addr (infixE@InfixExpr{op=o, inFixLeftExpr=lE, inFixRightExpr
                                          ++ [makeStmt' $ ICALLR(addr,"append",2)], Nothing)
                                   else if ((lType == TK_STRING) && (rType == TK_INT)) 
                                          then do
-                                                castNewAddr <- genNewAddr
+                                                castNewAddr <- genNewAddr TK_STRING
                                                 return ( lCode ++(addLabelToStmtList label1 rCode)
                                                   ++ [makeStmt' $ ICAST(castNewAddr, newRAddr, TK_STRING)]
                                                   ++ [makeStmt' $ IPARAM(0,2, newLAddr), makeStmt' $ IPARAM(1,2, castNewAddr)]
                                                   ++ [makeStmt' $ ICALLR(addr, "append",2)], Nothing)
                                          else if ((lType == TK_INT) && (rType == TK_STRING))
                                                 then do 
-                                                       castNewAddr <- genNewAddr
+                                                       castNewAddr <- genNewAddr TK_STRING
                                                        return ( lCode ++(addLabelToStmtList label1 rCode)
                                                          ++ [makeStmt' $ ICAST(castNewAddr, newLAddr, TK_STRING)]
                                                          ++  [makeStmt' $ IPARAM(0,2, castNewAddr), makeStmt' $ IPARAM(1,2, newRAddr)] 
@@ -462,7 +488,8 @@ transExpr level st addr (prefix@PrefixExpr{op=o,prefixExpr=pE,exprSrcPos=sP}) =
     else if isAddr pE 
            then return ([makeStmt' $ IPMINUS(addr, getAddr st pE)], Nothing)
            else do
-                  newAddr <- genNewAddr
+                  newAType <- getTackTypeFromExpr level st pE
+                  newAddr <- genNewAddr newAType
                   (code, label) <- transExpr level st newAddr pE
                   return (code ++ [makeStmt label $ IPMINUS(addr, newAddr)], Nothing)
         
@@ -481,7 +508,8 @@ transExpr level st addr (CastExpr {castExpr=cE,castType=cT,exprSrcPos=sP}) =
            return ([makeStmt Nothing $ ICAST(addr, getAddr st cE, cType)], Nothing)
     else do
            cType <- getTackType cT
-           newAddr   <- genNewAddr
+           newAType <- getTackTypeFromExpr level st cE
+           newAddr   <- genNewAddr newAType
            (code, label) <- transExpr level st newAddr cE
            return (code ++ [makeStmt label $ ICAST(addr, newAddr, cType)], Nothing)
        
@@ -489,7 +517,8 @@ transExpr level st addr (FieldExpr{fieldExpr=fE, fieldExprId=fId,exprSrcPos=_}) 
   if isAddr fE 
     then return ([makeStmt' $ IRECORD_READ(addr, getAddr st fE, fieldIdName fId)], Nothing)
     else do
-           newAddr   <- genNewAddr
+           newAType <- getTackTypeFromExpr level st fE
+           newAddr   <- genNewAddr newAType
            (code, label) <- transExpr level st newAddr fE
            return (code ++ [makeStmt label $ IRECORD_READ(addr, newAddr, fieldIdName fId)], Nothing)
  
@@ -498,18 +527,22 @@ transExpr level st addr (SubscriptExpr{sExpr=sE, subscript=subE,exprSrcPos=sP}) 
     then if isAddr subE 
            then return $ ( [makeStmt' $ IARRAY_READ(addr, getAddr st sE, getAddr st subE)], Nothing)
            else do
-                  newAddr <- genNewAddr
+                  newAType <- getTackTypeFromExpr level st subE
+                  newAddr <- genNewAddr newAType
                   (code, label) <- transExpr level st newAddr subE
                   return ( code ++ [makeStmt label $ IARRAY_READ(addr, getAddr st sE, newAddr)], Nothing)
     else if isAddr subE
            then do
-                  newAddr <- genNewAddr
+                  newAType <- getTackTypeFromExpr level st sE
+                  newAddr <- genNewAddr newAType
                   (code, label) <- transExpr level st newAddr sE
                   return ( code ++ [makeStmt label $ IARRAY_READ(addr, newAddr, getAddr st subE)], Nothing)
            else do
-                  newAddr1 <- genNewAddr
+                  newAType1 <- getTackTypeFromExpr level st sE
+                  newAddr1 <- genNewAddr newAType1
                   (code1, label1) <- transExpr level st newAddr1 sE
-                  newAddr2 <- genNewAddr
+                  newAType2 <- getTackTypeFromExpr level st subE
+                  newAddr2 <- genNewAddr newAType2
                   (code2, label2) <- transExpr level st newAddr2 subE
                   return (code1 ++ (addLabelToStmtList label1 code2) ++ [makeStmt label2 $ IARRAY_READ(addr, newAddr1, newAddr2)], Nothing)
  
@@ -574,7 +607,8 @@ transCond level st tLabel fLabel expr =
                                  "<=" -> return $ [makeStmt' $ ILE_JUMP(getAddr st lE, getAddr st rE, tLabel)] 
                                            ++ [makeStmt' $  IUNCOND_JUMP(fLabel)] 
                           else do
-                                 newAddr <- genNewAddr
+                                 newAType <- getTackTypeFromExpr level st rE
+                                 newAddr <- genNewAddr newAType
                                  (code, label) <- transExpr level st newAddr rE
                                  case o of 
                                    "==" -> return $ code ++ [makeStmt label $ IEQ_JUMP(getAddr st lE, newAddr, tLabel)] 
@@ -590,8 +624,9 @@ transCond level st tLabel fLabel expr =
                                    "<=" -> return $ code ++ [makeStmt label $ ILE_JUMP(getAddr st lE, newAddr, tLabel)] 
                                              ++ [makeStmt' $ IUNCOND_JUMP(fLabel)] 
                    else if isAddr rE
-                          then do 
-                                 newAddr <- genNewAddr
+                          then do
+                                 newAType <- getTackTypeFromExpr level st lE 
+                                 newAddr <- genNewAddr newAType
                                  (code, label) <- transExpr level st newAddr lE
                                  case o of
                                    "==" -> return $ code ++ [makeStmt label $ IEQ_JUMP(newAddr, getAddr st rE, tLabel)] 
@@ -607,8 +642,10 @@ transCond level st tLabel fLabel expr =
                                    "<=" -> return $ code ++ [makeStmt label $ ILE_JUMP(newAddr, getAddr st rE, tLabel)] 
                                              ++ [makeStmt' $ IUNCOND_JUMP(fLabel)] 
                           else do
-                                 newAddr1 <- genNewAddr
-                                 newAddr2 <- genNewAddr
+                                 newAType1 <- getTackTypeFromExpr level st lE 
+                                 newAType2 <- getTackTypeFromExpr level st rE 
+                                 newAddr1 <- genNewAddr newAType1
+                                 newAddr2 <- genNewAddr newAType2
                                  (code1, label1) <- transExpr level st newAddr1 lE
                                  (code2, label2) <- transExpr level st newAddr2 rE
                                  case o of
@@ -631,7 +668,8 @@ transCond level st tLabel fLabel expr =
                                             ++ [makeStmt label2 $ ILE_JUMP(newAddr1, newAddr2, tLabel)] 
                                             ++ [ makeStmt' $ IUNCOND_JUMP(fLabel)]          
             else do
-                   newAddr <- genNewAddr
+                   newAType <- getTackTypeFromExpr level st infixOpt 
+                   newAddr <- genNewAddr newAType
                    (code, label) <- transExpr level st newAddr infixOpt
                    return $ code ++ [makeStmt label $ ITRUE_JUMP(newAddr, tLabel), makeStmt' $ IUNCOND_JUMP(fLabel)]
     
@@ -646,7 +684,8 @@ transCond level st tLabel fLabel expr =
       if isAddr expr 
         then return [makeStmt' $ ITRUE_JUMP(getAddr st expr, tLabel), makeStmt' $ IUNCOND_JUMP(fLabel)]
         else do
-               newAddr <- genNewAddr
+               newAType <- getTackTypeFromExpr level st expr
+               newAddr <- genNewAddr newAType
                (code, label) <- transExpr level st newAddr expr
                return $ code ++ [makeStmt label $ ITRUE_JUMP(newAddr, tLabel), makeStmt' $ IUNCOND_JUMP(fLabel)]
 
@@ -668,7 +707,7 @@ insertSymbol level st (VarDef {varId=vId, varExpr=ve, stmtSrcPos=_}) =
         return $ insert st (VARIABLE (varId, exprType))
       _ ->
         do
-          newAddr <- genNewAddr
+          newAddr <- genNewAddr exprType
           return $ insert st (SUBST(varId, show newAddr, exprType))
 
 insertSymbol level st (WhileStmt {whileBoolExpr=bE, whileStmts=s, stmtSrcPos=sP}) =
@@ -681,7 +720,7 @@ insertArgument:: Int -> ST -> Type -> IO ST
 insertArgument level st (FieldType {fieldId=fId, fieldType=fType, typeSrcPos=sP}) =
   do
     fT     <- getTackType fType
-    return $ insert st (VARIABLE(fieldIdName fId, fT))
+    return $ insert st (ARGUMENT(fieldIdName fId, fT))
 
 insertArgument level st _ = return st
 

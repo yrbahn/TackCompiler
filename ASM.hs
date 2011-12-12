@@ -1,6 +1,6 @@
 module ASM where
-import Control.Monad.Trans
 import SymbolTable
+import Control.Monad.Trans
 
 data AsmProg = AsmProg Directive [Function]
 
@@ -79,6 +79,7 @@ instance Show Instruction where
   show (IMul a b) = "imul " ++ show a ++ ", " ++ show b
   show (Jmp l)    = "jmp " ++ l
   show (Je l)     = "je " ++ l
+  show (Jg l)     = "jg " ++ l
   show (Jge l)    = "jge " ++ l
   show (Jl l)     = "jl " ++ l
   show (Jle l)    = "jle " ++ l
@@ -98,16 +99,14 @@ data Operand =
   Res Register
   | ImmNum Int
   | LabelOperand String
-  | LabelString String
-  | Mem String
+  | Mem String String
   deriving (Eq)
 
 instance Show Operand where
   show (Res r) = show r
   show (ImmNum i)     = show i
   show (LabelOperand s)  = "OFFSET FLAT:"++ s
-  show (LabelString s)  = s
-  show (Mem s)        = "QWORD PTR [" ++ s ++ "]"
+  show (Mem m s)        =  m ++ " [" ++ s ++ "]"
 
 data Register = RAX | RBX | RCX | RDX | RSP | RBP | RSI | RDI 
   | R8 | R9 | R10 | R11 | R12 | R13 | R14 | R15
@@ -133,11 +132,14 @@ instance Show Register where
 
 paramRegs = [RDI, RSI, RDX, RCX, R8, R9]
 resultReg = RAX
-
+freeRegisters = [RAX,RCX,RDX,RSI,RDI,R8,R9,R10,R11]
+framePReg = RBP
+stackPReg = RSP
+ 
 data ASMState = ASMState
-  { funName::String, st::ST, symbols :: [(String,Int)], stringList::[(String,String)] }
+  { funName::String, st::ST, symbols :: [(String,Int)], stringList::[(String,String)], freeRegs::[Register] }
 
-emptyASMState = ASMState { funName="empty", st = empty, symbols = [], stringList=[]}
+emptyASMState = ASMState { funName="empty", st = empty, symbols = [], stringList=[], freeRegs=freeRegisters}
 
 newtype ASMTranslator m a = ASMTranslator 
   { runASM :: ASMState -> m (a, ASMState) }

@@ -85,7 +85,7 @@ instance Show IInst where
   show (IRECORD_READ(a,b,i)) = show a ++ " = " ++ show b ++ "." ++ i
   show (IRECORD_WRITE(a,i,b)) = show a ++ "." ++ i ++ " = " ++ show b
        	             
-data IAddr = IID String 
+data IAddr = IID String TACK_TYPE
             | IBOOL Bool
             | IINT  Int
             | ISTRING String
@@ -93,7 +93,7 @@ data IAddr = IID String
             | ISIZEOF TACK_TYPE
 
 instance Show IAddr where
-  show (IID str) = str
+  show (IID str _) = str
   show (IBOOL b) = 
     case b of
       True  -> "true"
@@ -102,6 +102,7 @@ instance Show IAddr where
   show (ISTRING str) = show str
   show INULL        = "null"
   show (ISIZEOF ty) = "sizeof(" ++ show ty ++ ")"
+
 
 makeStmt :: Maybe [ILabel] -> IInst -> IStmt
 makeStmt labels inst =
@@ -127,13 +128,24 @@ getAddr st (StringLit{stringValue=s, exprSrcPos=_}) = ISTRING s
 getAddr st (BoolLit{boolValue=b, exprSrcPos=_})     = IBOOL b 
 getAddr st (IntLit{intValue=i, exprSrcPos=_})       = IINT i
 getAddr st (NullLit{exprSrcPos=_})                  = INULL
-getAddr st (FunId {funIdName=fi, exprSrcPos=_})     = IID fi
+getAddr st (FunId {funIdName=fi, exprSrcPos=_})     = IID fi TK_NULL
 getAddr st (VarId {varIdName=vi, exprSrcPos=_})     = 
   case look_up st vi of 
-    I_SUBST(_,_,str,_) -> IID str
-    _ -> IID vi
+    I_SUBST(_,_,str,ty) -> IID str ty
+    I_VARIABLE(_,_,ty) -> IID vi ty
+    _ -> error "no such id"
 
 getAddr _ _                                        = INULL
+
+
+getAddrType :: IAddr -> TACK_TYPE
+getAddrType (IID _ t) = t
+getAddrType (IBOOL _) = TK_BOOL
+getAddrType (IINT _)  = TK_INT
+getAddrType (ISTRING _) = TK_STRING
+getAddrType INULL = TK_NULL
+getAddrType (ISIZEOF _) = TK_INT
+ 
 
 addLabel :: Maybe [ILabel] -> IStmt -> IStmt
 addLabel labels stmt@(ISTMT(labelL ,instr))  = 
@@ -145,15 +157,18 @@ addLabelToStmtList :: Maybe [ILabel] -> [IStmt] -> [IStmt]
 addLabelToStmtList label []     = []
 addLabelToStmtList label (x:xs) = (addLabel label x):xs
 
-getLeftAddr :: IInst -> Maybe IAddr
+getLeftAddr :: IInst -> Maybe String
 getLeftAddr inst = 
   case inst of
-    ICOPY (l, _) -> Just l
-    IPLUS  (l, _, _) -> Just l
-    IMINUS (l, _, _) -> Just l
-    ITIMES (l, _, _) -> Just l
-    IDIV   (l, _, _) -> Just l
-    IMOD   (l, _, _) -> Just l
-    IPMINUS (l, _)   -> Just l
-    ICALLR (l, _, _) -> Just l
+    ICOPY (IID var _, _)     -> Just var
+    IPLUS  (IID var _, _, _) -> Just var
+    IMINUS (IID var _, _, _) -> Just var
+    ITIMES (IID var _, _, _) -> Just var
+    IDIV   (IID var _, _, _) -> Just var
+    IMOD   (IID var _, _, _) -> Just var
+    IPMINUS (IID var _, _)   -> Just var
+    ICALLR (IID var _, _, _) -> Just var
+    ICAST (IID var _,_,_)    -> Just var
+    IARRAY_READ(IID var _,_,_) -> Just var
+    IRECORD_READ(IID var _,_,_) -> Just var
     _ -> Nothing
