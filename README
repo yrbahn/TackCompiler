@@ -24,5 +24,23 @@ PrintSymbolTable.hs -- Print a symbol table
 SemanticAnalyzer.hs --  Semantic Analyzer
 IR.hs  -- Intermediate Representation
 IRTranslator.hs -- IR Translator
+CodeGen.hs -- Linux X86-64 code generation
+ASM.hs -- Linux X86-64
+Main.hs
+
+requirement
+==========
+GHC 6.12 
+mtl-2.0.1.0 (for MonadTrans)
+
+How to run
+==========
+make        -- Compile haskell codes
+make trans  -- Linux x86-64 code generation
+make run    -- Compile x86-64 codes and Run
+
+
+
+
 
 
