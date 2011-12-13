@@ -1,6 +1,6 @@
 module Main where
 import TackParser
-import PrintSymbolTable
+import SemanticAnalyzer
 import SymbolTable
 import IRTranslator
 import IR
@@ -14,6 +14,7 @@ main = do
         Left msg -> putStrLn msg
         Right ast -> 
           do
+            semanticAnalyzer 0 empty ast
             ir <- transProg 0 empty ast
             (asm, _) <- runASM (codeGenProg ir) emptyASMState
             putStrLn $ show asm

@@ -23,7 +23,7 @@ semanticAnalyzer level st (Program {funDefList=fl}) =
     where
       insertIntriFun :: ST -> SYMBOL_DESC -> ST
       insertIntriFun st i = 
-        snd $ insert level st i       
+        insert st i       
 
 semanticAnalyzerFunDef ::  Int -> ST -> FunDef -> IO ()
 semanticAnalyzerFunDef level st (FunDef {funId=fId, funType=funT, bStmt=BlockStmt{stmtList=sL, stmtSrcPos=_}, funSrcPos=_}) =
@@ -51,8 +51,8 @@ semanticAnalyzerFieldLit level stAndType (FieldLit{fieldLitId=fId, fieldLitExpr=
       then
         do
           printSemanticError sP ("Could not resolve type for field " ++ "'" ++ fieldIdName fId ++ "'")
-          return $ (snd $ insert level st (VARIABLE (fieldIdName fId, fT)), (fieldIdName fId,fT):fieldTL)
-      else return $ (snd $ insert level st (VARIABLE (fieldIdName fId, fT)), (fieldIdName fId,fT):fieldTL)
+          return (insert st (VARIABLE (fieldIdName fId, fT)), (fieldIdName fId,fT):fieldTL)
+      else return ( insert st (VARIABLE (fieldIdName fId, fT)), (fieldIdName fId,fT):fieldTL)
 
 semanticAnalyzerType :: Int -> ST -> Type -> IO ST
 semanticAnalyzerType level st (RecordType {fieldTypeList=fieldL, typeSrcPos=_}) =
@@ -69,7 +69,7 @@ semanticAnalyzerType level st (ArrayType{arrayType=aT, typeSrcPos=sP}) =
 semanticAnalyzerType level st (FieldType {fieldId=FieldId{fieldIdName=fId, fieldIdSrcPos=_}, fieldType=fType, typeSrcPos=sP}) =
   do 
     fT     <- getTackType fType
-    new_st <- return $ snd $ insert level st (VARIABLE(fId, fT)) 
+    new_st <- return $ insert st (VARIABLE(fId, fT)) 
     semanticAnalyzerType level new_st fType
 
 semanticAnalyzerType level st (PrimitiveType {name=n, typeSrcPos=sP}) = 
@@ -132,7 +132,7 @@ semanticAnalyzerStmt level st (ForStmt {varId=vId, forExpr=fE, blockStmt=BlockSt
                then printSemanticError sP ("Could not resolve type for variable " ++ vIdName)
                else 
                  do
-                   let new_st' = snd $ insert level' new_st (VARIABLE (vIdName, t))
+                   let new_st' = insert new_st (VARIABLE (vIdName, t))
                    new_st'' <- foldM (insertVarDef level') new_st' sL
                    mapM_ (semanticAnalyzerStmt level' new_st'') sL    
           _ -> printSemanticError (srcPos fE) "Subject of for-loop must be array."
@@ -266,6 +266,7 @@ semanticAnalyzerExpr level st (PrefixExpr{op=o,prefixExpr=pE,exprSrcPos=sP}) =
         
 semanticAnalyzerExpr level st (CallExpr {fNameExpr=fN,argExprs=aE,exprSrcPos=sP}) =
   do
+--    putStrLn $ fN ++ (")=====\n)"
     funType <- semanticAnalyzerExpr level st fN
     case funType of
       (TK_FUN fName (TK_RECORD []) TK_NULL)-> return TK_NULL
@@ -274,11 +275,12 @@ semanticAnalyzerExpr level st (CallExpr {fNameExpr=fN,argExprs=aE,exprSrcPos=sP}
           let formalTL = map snd formalL 
           argL <- mapM (semanticAnalyzerExpr level st) aE
           if (length formalTL) == (length argL)
-            then if isSubTypeList argL formalTL
+            then if isSubTypeList formalTL argL 
                    then return retT
                    else
                      do 
-                       printSemanticError sP  ("Formal " ++ (listToString $ map fst formalL) ++ " of " ++ fName ++ " expect " ++ listToString formalTL ++ " found " ++ listToString argL ++ " instead" )
+                       printSemanticError sP  ("Formal " ++ (listToString $ map fst formalL) 
+                         ++ " of " ++ fName ++ " expect " ++ listToString formalTL ++ " found " ++ listToString argL ++ " instead" )
                        return retT
             else 
               do
@@ -310,7 +312,7 @@ semanticAnalyzerExpr level st (FieldExpr{fieldExpr=fE, fieldExprId=FieldId{field
               printSemanticError fSP ("Unknown field " ++ "'" ++ fId ++ "'")
               return TK_NULL
       _ -> do
-             printSemanticError fSP "Field expression expected."
+             printSemanticError fSP $ "Field expression expected." ++ show fType
              return $ TK_RECORD []
 
 semanticAnalyzerExpr level st (SubscriptExpr{sExpr=sE, subscript=subE,exprSrcPos=sP}) =
@@ -405,14 +407,14 @@ semanticAnalyzerExpr level st (VarId{varIdName=vId,exprSrcPos=sP}) =
 
 printSemanticError ::  SrcPos -> String -> IO ()
 printSemanticError p s = 
-  putStrLn $ show p ++ ": " ++ s
+  error $ show p ++ ": " ++ s
 
 insertFunDef :: Int -> ST -> FunDef -> IO ST
 insertFunDef level st (FunDef {funId=FunId {funIdName=fname, exprSrcPos=_}, funType=FunType{recordType=argT,retType=retT,typeSrcPos=_}, bStmt=_, funSrcPos=_}) =
   do
     argT' <- getTackType argT
     retT' <- getTackType retT
-    return $ snd $ insert level st (FUNCTION (fname, argT', retT'))
+    return $ insert st (FUNCTION (fname, argT', retT'))
 
 insertVarDef :: Int -> ST -> Stmt -> IO ST
 insertVarDef level st (VarDef {varId=vId, varExpr=ve, stmtSrcPos=_}) =
@@ -426,16 +428,16 @@ insertVarDef level st (VarDef {varId=vId, varExpr=ve, stmtSrcPos=_}) =
               then
                 do
                    printSemanticError sP ("Could not resolve type for variable " ++ "'" ++ varId ++ "'")
-                   return $ snd $ insert level st (VARIABLE (varId, exprType))
-              else return $ snd $ insert level st (VARIABLE (varId, exprType))
+                   return $ insert st (VARIABLE (varId, exprType))
+              else return $ insert st (VARIABLE (varId, exprType))
           (TK_RECORD fList) ->
             let fieldTypeL= ( filter (\x -> isEmptyArray (snd x) ) fList )  in
               if fieldTypeL == [] 
-                then return $ snd $ insert level st (VARIABLE (varId, exprType))
+                then return $ insert st (VARIABLE (varId, exprType))
                 else do
                        printSemanticError sP ("Could not resolve type for variable " ++ "'" ++ varId ++ "'")
-                       return $ snd $ insert level st (VARIABLE (varId, exprType))
-          _ -> return $ snd $ insert level st (VARIABLE (varId, exprType))
+                       return $ insert st (VARIABLE (varId, exprType))
+          _ -> return $ insert st (VARIABLE (varId, exprType))
     _  -> return st
 
 insertVarDef level st (WhileStmt {whileBoolExpr=bE, whileStmts=s, stmtSrcPos=sP}) =
@@ -448,7 +450,7 @@ insertFieldVar :: Int -> ST -> Type -> IO ST
 insertFieldVar level st (FieldType {fieldId=fId, fieldType=fType, typeSrcPos=sP}) =
   do
     fT     <- getTackType fType
-    return $ snd $ insert level st (VARIABLE(fieldIdName fId, fT))
+    return $ insert st (VARIABLE(fieldIdName fId, fT))
 
 insertFieldVar level st _ = return st
 

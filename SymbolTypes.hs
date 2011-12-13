@@ -13,6 +13,12 @@ data TACK_TYPE  = TK_INT
                 | TK_ERROR
                 deriving (Eq)              
 
+tkIntSize     = 8
+tkStringSize  = 8
+tkBoolSize    = 8
+tkVoidSize    = 8
+tkDefaultSize = 8
+
 instance Show TACK_TYPE where
   show TK_INT = "int"
   show TK_NULL = "null"
@@ -23,7 +29,34 @@ instance Show TACK_TYPE where
   show (TK_ARRAY t)    = "[ " ++ show t ++ " ]"
   show (TK_FUN _ a r)  = "" ++ show a ++ " -> " ++ show r ++ ""
   show TK_ERROR        = "Error"
-  
+
+getTypeSize :: TACK_TYPE -> Int
+getTypeSize ty = 
+  case ty of
+    TK_INT    -> tkIntSize
+    TK_STRING -> tkStringSize
+    TK_BOOL   -> tkBoolSize
+    TK_VOID   -> tkVoidSize
+    TK_RECORD fieldList -> foldl (\s tp -> s + (getElemTypeSize $ snd tp) )  0 fieldList
+    TK_ARRAY  elemT -> getElemTypeSize elemT
+    TK_FUN  _ _ _ -> tkVoidSize
+    _  -> tkDefaultSize 
+
+getElemTypeSize :: TACK_TYPE -> Int
+getElemTypeSize (TK_RECORD _) = tkVoidSize
+getElemTypeSize (TK_ARRAY  _) = tkVoidSize
+getElemTypeSize t           = getTypeSize t 
+ 
+getFieldOffset :: TACK_TYPE -> String -> Int
+getFieldOffset record fId =
+  case record of
+    TK_RECORD elemType -> getOffset 0 elemType
+    _ -> error "record type is required"
+  where getOffset os [] = error "no such field Id"
+        getOffset os ((fI,ty):rest) = if fI == fId 
+                                      then os
+                                      else getOffset (os + (getElemTypeSize ty)) rest
+
 tupleListToString :: [(String,TACK_TYPE)] -> String
 tupleListToString ((x,y):[]) = x ++ ":" ++ show y 
 tupleListToString ((x,y):xs) = x ++ ":" ++ show y ++ ", " ++ tupleListToString xs
@@ -55,12 +88,16 @@ instance TackType TACK_TYPE where
 
   isSame a b = a == b
 
+  -- isSubType = a >= b
+  isSubType TK_VOID       b      = True
   isSubType TK_NULL       b      = True
   isSubType (TK_RECORD a) (TK_RECORD b) = 
-    a == b || ( ( length b  <= length a ) && (maybe True (\x -> False) $ find (==False) (zipWith (\x y-> x == y) a b))) 
-  isSubType (TK_ARRAY a)  (TK_ARRAY b)  = isEmptyRecord(b) || isSame a b 
+    a == b || ( ( length a  <= length b ) 
+    && (maybe True (\x -> False) $ find (==False) (zipWith (\x y-> (fst x == fst y) && isSubType (snd x) (snd y)) a b))) 
+  isSubType (TK_ARRAY a)  (TK_ARRAY b)  = isEmptyRecord(a) || isSame a b 
   isSubType a             b             = isSame a b
  
+  -- isCastable = a <-> b
   isCastable a b =
     case (isBasicType a, isBasicType b) of
       (True, True) -> True 

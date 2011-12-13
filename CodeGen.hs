@@ -174,6 +174,22 @@ codeGenInst (ICAST(l,r,ty)) =
                    freeRegister argReg
                    freeRegister retReg
                    return result
+              (TK_STRING, TK_INT) ->
+                do (argReg,instL) <- moveToReg r RDI
+                   leftOp <- getOperand l
+                   retReg <- allocRegister resultReg
+                   let result = instL ++ [Call "string2int", Mov leftOp retReg]
+                   freeRegister argReg
+                   freeRegister retReg
+                   return result
+              (TK_STRING, TK_BOOL) ->
+                do (argReg,instL) <- moveToReg r RDI
+                   leftOp <- getOperand l
+                   retReg <- allocRegister resultReg
+                   let result = instL ++ [Call "string2bool", Mov leftOp retReg]
+                   freeRegister argReg
+                   freeRegister retReg
+                   return result
               _ -> do leftOp <- getOperand l
                       (newReg, instL) <- moveToAnyReg r                           
                       let result = instL ++ [Mov leftOp newReg]
@@ -185,7 +201,7 @@ codeGenInst (IUNCOND_JUMP(l)) =
 
 codeGenInst (ITRUE_JUMP(b,l)) =
   do (newReg, instL) <- moveToAnyReg b
-     let result = instL ++ [Cmp newReg (ImmNum 0), Jne l]
+     let result = instL ++ [Cmp newReg (ImmNum 1), Je l]
      freeRegister newReg
      return result
 
@@ -301,8 +317,36 @@ codeGenInst (IARRAY_WRITE(array,index,addr)) =
      freeRegister newReg3
      return result
 
-codeGenInst _ = return []
--- 
+codeGenInst (IRECORD_READ(l,b,fId)) = 
+  do let (IID _ recordType) = b
+     case recordType of
+       (TK_RECORD elemType) ->
+         do let offset = getFieldOffset recordType fId
+            (newReg1, instL1) <- moveToAnyReg b
+            tempReg <- allocAnyRegister
+            leftOp <- getOperand l
+            let result = instL1 ++ [Add newReg1 (ImmNum offset)] 
+                         ++ [Mov tempReg (Mem "" $ show newReg1), Mov leftOp tempReg]
+            freeRegister newReg1
+            freeRegister tempReg
+            return result       
+       _ -> error "need record type"
+	
+codeGenInst (IRECORD_WRITE(b,fId,r)) =
+  do let (IID _ recordType) = b
+     case recordType of
+       (TK_RECORD elemType) ->
+         do let offset = getFieldOffset recordType fId
+            --lift $ putStrLn $ fId ++ (show offset)
+            (newReg1, instL1) <- moveToAnyReg b
+            (newReg2, instL2) <- moveToAnyReg r
+            let result = instL1 ++ [Add newReg1 (ImmNum offset)] 
+                         ++ instL2 ++ [Mov (Mem "" $ show newReg1) newReg2]
+            freeRegister newReg1     
+            freeRegister newReg2  
+            return result
+       _ -> error "need record type"
+
 getOperand :: IAddr -> ASMTranslator IO Operand
 getOperand (IID i _) = 
   do s <- getASMState 
@@ -334,9 +378,7 @@ getOperand INULL =
 
 
 getOperand (ISIZEOF ty) =
-  case ty of
-    TK_INT -> return $ ImmNum 8
-    _      -> return $ ImmNum 8 	
+  return $ ImmNum $ getTypeSize ty
 
 
 --

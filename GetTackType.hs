@@ -1,4 +1,4 @@
-module GetTackType where
+module GetTackType ( getTackType, getTackTypeFromExpr) where
 import AST
 import SymbolTypes
 import SymbolTable
@@ -19,7 +19,7 @@ getTackType RecordType{fieldTypeList=fL, typeSrcPos=_} =
         do
          fType <- getTackType fT
          return $ (fId,fType)
-
+      
 getTackType FunType{recordType=rT, retType=retT, typeSrcPos=_} =
   do
     argType <- getTackType rT
@@ -33,6 +33,14 @@ getTackType PrimitiveType{name=t, typeSrcPos=_} =
     "string" -> return TK_STRING
     "void"   -> return TK_VOID
     _        -> return TK_ERROR 
+
+
+getTackElemType :: Type -> IO TACK_TYPE
+getTackElemType (pType@PrimitiveType{name=t, typeSrcPos=_})  =
+  getTackType pType
+
+getTackElemType _ = return TK_VOID
+
 
 getTackTypeFromExpr :: Int -> ST -> Expr -> IO TACK_TYPE
 getTackTypeFromExpr level st (InfixExpr{op=o, inFixLeftExpr=lE, inFixRightExpr=rE, exprSrcPos=_}) =
